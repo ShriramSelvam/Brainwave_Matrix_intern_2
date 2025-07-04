@@ -1,30 +1,41 @@
-🖼️ Text to Image Generation App
-A simple web app that generates images from text prompts using Stable Diffusion XL. Built using Streamlit and the Hugging Face Diffusers library.
+#  🖼️ Text to Image Generation App
+A simple web app that generates images from text prompts using Stable Diffusion v1.5. Built using Streamlit and the Hugging Face Diffusers library.
 
-🌐 Live Demo (if hosted): [link-to-app]
+🌐 Live Demo : https://text-to-image-shriram.streamlit.app/
 
-📊 Project Overview
-This project takes a text description (prompt) as input and returns a high-quality AI-generated image. It uses Hugging Face's DiffusionPipeline with the StabilityAI SDXL model.
+---
+## 📊 Project Overview
+This project takes a text description (prompt) as input and returns a high-quality AI-generated image. It uses Hugging Face's `StableDiffusionPipeline` with the `runwayml/stable-diffusion-v1-5` model.
 
-🔍 Features
+---
+## 🔍 Features
 ✅ Easy-to-use Streamlit interface  
 ✅ Real-time image generation  
 ✅ Powered by Stable Diffusion XL  
 ✅ Lightweight and portable  
 ✅ Works on CPU and GPU  
 
-🚀 Tech Stack
+---
+
+## 🚀 Tech Stack
 - Python
 - Streamlit
 - diffusers (by Hugging Face)
 - Torch
 - Transformers
+- PIL (for image handling)
 
-📁 Project Structure
+---
+
+## 📁 Project Structure
+```plaintext
 text_to_image_app/
-├── app.py                   ← Main Streamlit app  
+├── app.py                   ← Main Streamlit app 
+├── text_to_image.ipynb      ← Main Jupyter Notebook 
 ├── requirements.txt         ← Python dependencies  
-├── README.md                ← Project info  
+├── README.md                ← This file
+```
+---
 
-🙋‍♂️ Author  
+## 🙋‍♂️ Author  
 Shriram Selvam
