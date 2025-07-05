@@ -4,6 +4,14 @@ import torch
 from diffusers import StableDiffusionPipeline, EulerDiscreteScheduler
 from PIL import Image
 
+# 🔧 Convert PIL image to bytes for download
+def image_to_bytes(img):
+    from io import BytesIO
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    byte_im = buf.getvalue()
+    return byte_im
+    
 # 🧠 Fix known issues on some systems (e.g., PyTorch on Windows)
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -50,7 +58,7 @@ if st.button("Generate Image") and pipe:
         try:
             result = pipe(prompt, guidance_scale=guidance_scale, num_inference_steps=steps)
             image: Image.Image = result.images[0]
-            st.image(image, caption="🎨 Generated Image", use_column_width=True)
+            st.image(image, caption="🎨 Generated Image", use_container_width=True)
 
             # Add download button
             st.download_button(
@@ -61,11 +69,3 @@ if st.button("Generate Image") and pipe:
             )
         except Exception as e:
             st.error(f"❌ Error during image generation: {e}")
-
-# 🔧 Convert PIL image to bytes for download
-def image_to_bytes(img):
-    from io import BytesIO
-    buf = BytesIO()
-    img.save(buf, format="PNG")
-    byte_im = buf.getvalue()
-    return byte_im
