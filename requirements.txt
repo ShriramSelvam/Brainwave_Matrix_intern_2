@@ -1,7 +1,3 @@
 streamlit
-torch
-diffusers
-transformers
-accelerate
-safetensors
+requests
 Pillow
