@@ -34,7 +34,7 @@ if not HF_TOKEN:
     st.error("❌ Hugging Face token not found. Add HF_TOKEN to Streamlit Secrets or set env var HF_TOKEN.")
     st.stop()
 
-API_URL = f"https://api-inference.huggingface.co/models/{MODEL_ID}"
+API_URL = f"https://api-inference.huggingface.co/pipeline/text-to-image"
 HEADERS = {"Authorization": f"Bearer {HF_TOKEN}"}
 
 # ----------------------------
