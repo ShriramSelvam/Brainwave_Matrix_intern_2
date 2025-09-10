@@ -1,74 +1,103 @@
 import os
 import streamlit as st
-import torch
-from diffusers import StableDiffusionPipeline, EulerDiscreteScheduler
+import requests
 from PIL import Image
+from io import BytesIO
+import base64
 
-# 🔧 Convert PIL image to bytes for download
-def image_to_bytes(img):
-    from io import BytesIO
-    buf = BytesIO()
-    img.save(buf, format="PNG")
-    return buf.getvalue()
+st.set_page_config(page_title="Text-to-Image (HF Inference API)", layout="centered")
+st.title("🚀 Text → Image (Hugging Face Inference API)")
 
-# 🧠 Fix known issues on some systems
-os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
-os.environ["STREAMLIT_SERVER_FILE_WATCHER_TYPE"] = "none"
+# Prompt + params
+prompt = st.text_input("Enter an image prompt:", "A futuristic city skyline at sunset")
+guidance_scale = st.slider("Guidance Scale", 1.0, 20.0, 7.5)
+steps = st.slider("Inference Steps", 10, 50, 25)
 
-# 📄 Page configuration
-st.set_page_config(page_title="Text-to-Image Generator", layout="centered")
-st.title("🖼️ AI Text-to-Image Generator")
-st.markdown("Generate images from text prompts using Stable Diffusion.")
+# Choose model (server-side model hosted by HF)
+# You can change to another HF model if you prefer.
+MODEL_ID = "stabilityai/stable-diffusion-2"   # or "stabilityai/sd-xl-beta" or "stabilityai/sd-turbo"
 
-@st.cache_resource(show_spinner=True)
-def load_pipeline():
+# Get token from Streamlit secrets or environment
+HF_TOKEN = None
+if "HF_TOKEN" in st.secrets:
+    HF_TOKEN = st.secrets["HF_TOKEN"]
+else:
+    HF_TOKEN = os.getenv("HF_TOKEN")
+
+if not HF_TOKEN:
+    st.error("Hugging Face token not found. Add HF_TOKEN to Streamlit Secrets or set env var HF_TOKEN.")
+    st.stop()
+
+API_URL = f"https://api-inference.huggingface.co/models/{MODEL_ID}"
+HEADERS = {"Authorization": f"Bearer {HF_TOKEN}"}
+
+def call_hf_api(prompt_text, steps=25, guidance=7.5):
+    payload = {
+        "inputs": prompt_text,
+        "options": {"wait_for_model": True},
+        "parameters": {
+            "num_inference_steps": int(steps),
+            "guidance_scale": float(guidance)
+        }
+    }
+    resp = requests.post(API_URL, headers=HEADERS, json=payload, timeout=240)
+    return resp
+
+def extract_image_from_response(resp):
+    # If HF returns raw image bytes
+    ct = resp.headers.get("content-type", "")
+    if ct.startswith("image"):
+        return Image.open(BytesIO(resp.content))
+
+    # Otherwise try JSON (some endpoints return base64 in JSON)
     try:
-        # ✅ Detect Streamlit Cloud (limited RAM)
-        is_cloud = os.environ.get("STREAMLIT_RUNTIME") is not None
-
-        if is_cloud:
-            model_id = "stabilityai/sd-turbo"   # lightweight model
-        else:
-            model_id = "runwayml/stable-diffusion-v1-5"  # full model
-
-        scheduler = EulerDiscreteScheduler.from_pretrained(model_id, subfolder="scheduler")
-
-        pipe = StableDiffusionPipeline.from_pretrained(
-            model_id,
-            scheduler=scheduler,
-            torch_dtype=torch.float32
-        )
-
-        pipe.to("cpu")  # CPU mode for compatibility
-        return pipe
-
-    except Exception as e:
-        st.error(f"❌ Failed to load model: {e}")
+        data = resp.json()
+    except Exception:
+        st.error(f"Unexpected response content-type: {ct}\nStatus: {resp.status_code}")
         return None
 
-pipe = load_pipeline()
+    if isinstance(data, dict) and data.get("error"):
+        st.error(f"Hugging Face API error: {data.get('error')}")
+        return None
 
-# ✏️ Prompt input
-prompt = st.text_input("Enter your image prompt:", "A futuristic city skyline at sunset")
+    # Some HF endpoints return base64 list under "images" or similar
+    if isinstance(data, dict) and "images" in data and len(data["images"]) > 0:
+        img_b64 = data["images"][0]
+        img_bytes = base64.b64decode(img_b64)
+        return Image.open(BytesIO(img_bytes))
 
-# ⚙️ Parameters
-guidance_scale = st.slider("Guidance Scale", 1.0, 15.0, 7.5)
-steps = st.slider("Inference Steps", 5, 30, 15)
+    # Try common keys containing base64
+    for key in ("generated_images", "image", "images"):
+        if key in data:
+            val = data[key]
+            if isinstance(val, list) and len(val) > 0:
+                img_b64 = val[0]
+                if isinstance(img_b64, str):
+                    img_bytes = base64.b64decode(img_b64)
+                    return Image.open(BytesIO(img_bytes))
 
-# 🖼️ Generate image
-if st.button("Generate Image") and pipe:
-    with st.spinner("Generating image... Please wait..."):
+    st.error("Could not decode image from HF API response.")
+    return None
+
+# Generate button
+if st.button("Generate Image"):
+    with st.spinner("Calling Hugging Face Inference API — this may take a few seconds..."):
         try:
-            result = pipe(prompt, guidance_scale=guidance_scale, num_inference_steps=steps)
-            image: Image.Image = result.images[0]
-            st.image(image, caption="🎨 Generated Image", use_container_width=True)
-
-            st.download_button(
-                label="Download Image",
-                data=image_to_bytes(image),
-                file_name="generated_image.png",
-                mime="image/png"
-            )
-        except Exception as e:
-            st.error(f"❌ Error during image generation: {e}")
+            response = call_hf_api(prompt, steps=steps, guidance=guidance_scale)
+            if response.status_code != 200:
+                # Show helpful error messages
+                try:
+                    err = response.json()
+                    st.error(f"HF API returned {response.status_code}: {err}")
+                except Exception:
+                    st.error(f"HF API returned status {response.status_code}: {response.text}")
+            else:
+                image = extract_image_from_response(response)
+                if image:
+                    st.image(image, use_container_width=True, caption="Generated Image")
+                    # Download
+                    buf = BytesIO()
+                    image.save(buf, format="PNG")
+                    st.download_button("Download PNG", buf.getvalue(), "generated.png", "image/png")
+        except requests.exceptions.RequestException as e:
+            st.error(f"Network/timeout error: {e}")
