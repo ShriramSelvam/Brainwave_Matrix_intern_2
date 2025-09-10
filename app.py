@@ -15,7 +15,7 @@ steps = st.slider("Inference Steps", 10, 50, 25)
 
 # Choose model (server-side model hosted by HF)
 # You can change to another HF model if you prefer.
-MODEL_ID = "stabilityai/stable-diffusion-2"   # or "stabilityai/sd-xl-beta" or "stabilityai/sd-turbo"
+MODEL_ID = "runwayml/stable-diffusion-v1-5"
 
 # Get token from Streamlit secrets or environment
 HF_TOKEN = None
